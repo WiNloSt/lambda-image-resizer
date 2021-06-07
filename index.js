@@ -8,6 +8,7 @@ exports.handler = (event, context, callback) => {
   /** @type {typeof mockRequest} */
   const request = event.Records[0].cf.request
   const parameters = new URLSearchParams(request.querystring)
+  console.log('parameters', parameters)
   const normalizedParameters = normalizeParameters(parameters)
   console.log('normalizedParameters', normalizedParameters)
   if (normalizedParameters) {
@@ -138,14 +139,20 @@ function toHeaderKey(s3ResultKey) {
 function normalizeParameters(parameters) {
   const normalizedParameters = {}
   if (parameters.get('size')) {
-    const size = parameters.get('size')
-    normalizedParameters.size = size.split(/x/i).map((dimensionString) => {
-      if (dimensionString) {
-        return Number(dimensionString)
-      } else {
-        return undefined
-      }
-    })
+    normalizedParameters.size = parameters
+      .get('size')
+      .split(/x/i)
+      .map((dimensionString) => {
+        if (dimensionString) {
+          return Number(dimensionString)
+        } else {
+          return undefined
+        }
+      })
+  }
+
+  if (parameters.get('background')) {
+    normalizedParameters.background = parameters.get('background')
   }
 
   if (!isObjectEmpty(normalizedParameters)) {
@@ -190,9 +197,19 @@ function processImage(imageBuffer, normalizedParameters) {
   let sharpImage = sharp(imageBuffer)
 
   if (normalizedParameters.size) {
-    console.log('resizing image')
+    console.log('resizing image', normalizedParameters.size)
     const [width, height] = normalizedParameters.size
     sharpImage = sharpImage.resize({ width, height })
+  }
+
+  if (normalizedParameters.background) {
+    console.log(
+      'adding image background color',
+      normalizedParameters.background
+    )
+    sharpImage = sharpImage.flatten({
+      background: normalizedParameters.background,
+    })
   }
 
   return sharpImage.toBuffer()
