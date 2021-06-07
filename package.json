@@ -13,6 +13,8 @@
   },
   "scripts": {
     "build": "zip -r function.zip .",
-    "deploy": "aws lambda update-function-code --region us-east-1 --function-name transformImageWithQueryString --zip-file fileb://function.zip"
+    "upload-to-lambda": "aws lambda update-function-code --region us-east-1 --function-name transformImageWithQueryString --zip-file fileb://function.zip",
+    "publish-new-version": "aws lambda publish-version --region us-east-1 --function-name transformImageWithQueryString",
+    "deploy": "yarn build && yarn upload-to-lambda && yarn publish-new-version"
   }
 }

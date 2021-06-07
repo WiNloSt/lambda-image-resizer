@@ -1,6 +1,5 @@
 const aws = require('aws-sdk')
 const sharp = require('sharp')
-const querystring = require('querystring')
 const FileType = require('file-type')
 
 const s3 = new aws.S3({ region: 'eu-west-1' })
@@ -8,9 +7,10 @@ const s3 = new aws.S3({ region: 'eu-west-1' })
 exports.handler = (event, context, callback) => {
   /** @type {typeof mockRequest} */
   const request = event.Records[0].cf.request
-  const params = querystring.parse(request.querystring)
-  const size = normalizeSize(params.size)
-  if (size) {
+  const parameters = new URLSearchParams(request.querystring)
+  const normalizedParameters = normalizeParameters(parameters)
+  console.log('normalizedParameters', normalizedParameters)
+  if (normalizedParameters) {
     const bucket = request.origin.s3.domainName.split('.')[0]
     const key = request.uri.substring(1)
     const s3Params = {
@@ -20,13 +20,14 @@ exports.handler = (event, context, callback) => {
     s3.getObject(s3Params)
       .promise()
       .then(async (result) => {
-        const [width, height] = size
         const fileType = await FileType.fromBuffer(result.Body)
         if (fileType) {
-          const resizedImageBuffer = await sharp(result.Body)
-            .resize({ width, height })
-            .toBuffer()
-          return [resizedImageBuffer, getHeadersFromFileType(fileType)]
+          const processedImageBuffer = await processImage(
+            result.Body,
+            normalizedParameters
+          )
+
+          return [processedImageBuffer, getHeadersFromFileType(fileType)]
         } else {
           return [result.Body, getHeadersFromS3Result(result)]
         }
@@ -131,26 +132,36 @@ function toHeaderKey(s3ResultKey) {
 
 /**
  *
- * @param {string=} size valid value = <width>x<height>, <width>x, x<height>
- * @returns {[number|undefined, number|undefined]|null} [width, height]
+ * @param {URLSearchParams} parameters
+ * @returns {object|null}
  */
-function normalizeSize(size) {
-  if (size) {
-    return size.split(/x/i).map((dimensionString) => {
+function normalizeParameters(parameters) {
+  const normalizedParameters = {}
+  if (parameters.get('size')) {
+    const size = parameters.get('size')
+    normalizedParameters.size = size.split(/x/i).map((dimensionString) => {
       if (dimensionString) {
         return Number(dimensionString)
       } else {
         return undefined
       }
     })
+  }
+
+  if (!isObjectEmpty(normalizedParameters)) {
+    return normalizedParameters
   } else {
     return null
   }
 }
 
-function normalizeFormat(s3Key) {
-  const match = /\/.+\.(?<extension>.+)$/.exec(s3Key)
-  return match.groups.extension
+/**
+ *
+ * @param {object} object
+ * @returns
+ */
+function isObjectEmpty(object) {
+  return Object.keys(object).length === 0
 }
 
 const mockRequest = {
@@ -173,4 +184,16 @@ const mockRequest = {
   },
   querystring: 'size=100x',
   uri: '/choice_images/2.png',
+}
+
+function processImage(imageBuffer, normalizedParameters) {
+  let sharpImage = sharp(imageBuffer)
+
+  if (normalizedParameters.size) {
+    console.log('resizing image')
+    const [width, height] = normalizedParameters.size
+    sharpImage = sharpImage.resize({ width, height })
+  }
+
+  return sharpImage.toBuffer()
 }
