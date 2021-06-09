@@ -155,6 +155,19 @@ function normalizeParameters(parameters) {
     normalizedParameters.background = parameters.get('background')
   }
 
+  if (parameters.get('crop')) {
+    const [left, top, width, height] = parameters
+      .get('crop')
+      ?.split(',')
+      .map(Number)
+    normalizedParameters.crop = {
+      left,
+      top,
+      width,
+      height,
+    }
+  }
+
   if (!isObjectEmpty(normalizedParameters)) {
     return normalizedParameters
   } else {
@@ -196,8 +209,13 @@ const mockRequest = {
 function processImage(imageBuffer, normalizedParameters) {
   let sharpImage = sharp(imageBuffer)
 
+  if (normalizedParameters.crop) {
+    console.log('cropping the image', normalizedParameters.crop)
+    sharpImage = sharpImage.extract(normalizedParameters.crop)
+  }
+
   if (normalizedParameters.size) {
-    console.log('resizing image', normalizedParameters.size)
+    console.log('resizing the image', normalizedParameters.size)
     const [width, height] = normalizedParameters.size
     sharpImage = sharpImage.resize({ width, height })
   }
