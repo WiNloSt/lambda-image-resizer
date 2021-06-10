@@ -155,6 +155,10 @@ function normalizeParameters(parameters) {
     normalizedParameters.background = parameters.get('background')
   }
 
+  if (parameters.get('tint')) {
+    normalizedParameters.tint = parameters.get('tint')
+  }
+
   if (parameters.get('crop')) {
     const [left, top, width, height] = parameters
       .get('crop')
@@ -218,6 +222,11 @@ function processImage(imageBuffer, normalizedParameters) {
     console.log('resizing the image', normalizedParameters.size)
     const [width, height] = normalizedParameters.size
     sharpImage = sharpImage.resize({ width, height })
+  }
+
+  if (normalizedParameters.tint) {
+    console.log('tinting the image', normalizedParameters.tint)
+    sharpImage = sharpImage.tint(normalizedParameters.tint)
   }
 
   if (normalizedParameters.background) {
